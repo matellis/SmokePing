@@ -707,6 +707,10 @@ sub get_tree($$){
 
 sub target_menu($$$$;$);
 sub target_menu($$$$;$){
+    my $tmp;
+    my $sectionid;
+    my $panel_count = 3;
+
     my $tree = shift;
     my $open = shift;
     $open = [@$open]; # make a copy 
@@ -719,31 +723,30 @@ sub target_menu($$$$;$){
     foreach my $prop (sort {exists $tree->{$a}{_order} ? ($tree->{$a}{_order} <=> $tree->{$b}{_order}) : ($a cmp $b)} 
                       grep {  ref $tree->{$_} eq 'HASH' and not /^__/ }
                       keys %$tree) {
-            push @hashes, $prop;
-    }
+                          push @hashes, $prop;
+                      }
     return wantarray ? () : "" unless @hashes;
 
-	$print .= qq{<ul class="menu">\n}
-		unless $filter;
+    $print .= qq{<div class="menu">\n}
+        unless $filter;
 
-	my @matches;
+    my @matches;
     for my $key (@hashes) {
-
-		my $menu = $key;
+        my $menu = $key;
         my $title = $key;
         my $hide;
         my $host;
         my $menuextra;
         if ($tree->{$key}{__tree_link} and $tree->{$key}{__tree_link}{menu}){
-    		$menu = $tree->{$key}{__tree_link}{menu};
-    		$title = $tree->{$key}{__tree_link}{title};
-    		$host = $tree->{$key}{__tree_link}{host};
+    	    $menu = $tree->{$key}{__tree_link}{menu};
+    	    $title = $tree->{$key}{__tree_link}{title};
+            $host = $tree->{$key}{__tree_link}{host};
             $menuextra = $tree->{$key}{__tree_link}{menuextra};
             next if $tree->{$key}{__tree_link}{hide} and $tree->{$key}{__tree_link}{hide} eq 'yes';
         } elsif ($tree->{$key}{menu}) {	
-	        $menu = $tree->{$key}{menu};
-	        $title = $tree->{$key}{title};
-    		$host = $tree->{$key}{host};
+	    $menu = $tree->{$key}{menu};
+	    $title = $tree->{$key}{title};
+    	    $host = $tree->{$key}{host};
             $menuextra = $tree->{$key}{menuextra};
             next if $tree->{$key}{hide} and $tree->{$key}{hide} eq 'yes';
         }
@@ -753,56 +756,82 @@ sub target_menu($$$$;$){
             $menuextra = undef;
         }
 
-		my $class = 'menuitem';
-		my $menuclass = "menulink";
-   	    if ($key eq $current ){
-			if ( @$open ) {
-         		$class = 'menuopen';
-    		} else {
-   	            $class = 'menuactive';
+        my $class = 'hop';
+        my $menuclass = "menulink";
+        if ($key eq $current ){
+	    if ( @$open ) {
+                $class = 'menuopen';
+    	    } else {
+   	        $class = 'menuactive';
                 $menuclass = "menulinkactive";
             }
-   	    };
-		if ($filter){
-			if (($menu and $menu =~ /$filter/i) or ($title and $title =~ /$filter/i)){
-				push @matches, ["$path$key$suffix",$menu,$class,$menuclass];
-			};
-			push @matches, target_menu($tree->{$key}, $open, "$path$key.",$filter, $suffix);
-		}
-		else {
-             if ($menuextra){
-                 $menuextra =~ s/{HOST}/#$host/g;
-                 $menuextra =~ s/{CLASS}/$menuclass/g;
-                 $menuextra =~ s/{HASH}/#/g;
-                 $menuextra =~ s/{HOSTNAME}/$host/g;
-                 $menuextra = '&nbsp;'.$menuextra;
-             } else {
-                 $menuextra = '';
-             }
-
-          	$print .= qq{<li class="$class"><a class="$menuclass" href="$path$key$suffix">$menu</a>\n};
-     	    if ($key eq $current){
-        	    my $prline = target_menu $tree->{$key}, $open, "$path$key.",$filter, $suffix;
-	            $print .= $prline
-   		           if $prline;
-        	}
-            $print .= "</li>";
-		}
-    }
-    $print .= "</ul>\n" unless $filter;
+   	};
 	if ($filter){
-		if (wantarray()){
-			return @matches;
-		}
-		else {
-			$print .= qq{<ul class="menu">\n};
-			for my $entry (sort {$a->[1] cmp $b->[1] } grep {ref $_ eq 'ARRAY'} @matches) {
-				my ($href,$menu,$class,$menuclass) = @{$entry};
-				$print .= qq{<li class="$class"><a class="$menuclass" href="$href">$menu</a></li>\n};
-			}
-			$print .= "</ul>\n";
-		}
+	    if (($menu and $menu =~ /$filter/i) or ($title and $title =~ /$filter/i)){
+	        push @matches, ["$path$key$suffix",$menu,$class,$menuclass];
+            };
+	    push @matches, target_menu($tree->{$key}, $open, "$path$key.",$filter, $suffix);
+	} else {
+            if ($menuextra){
+                $menuextra =~ s/{HOST}/#$host/g;
+                $menuextra =~ s/{CLASS}/$menuclass/g;
+                $menuextra =~ s/{HASH}/#/g;
+                $menuextra =~ s/{HOSTNAME}/$host/g;
+                $menuextra = '&nbsp;'.$menuextra;
+            } else {
+                $menuextra = '';
+            }
+
+            if ( $path =~ /\.\z/ ) {
+                $print .= qq{<p class="hop $menuclass"><a href="$path$key$suffix" style='text-transform:uppercase;'>$menu</a>\n};
+                if ($key eq $current){
+                    my $prline = target_menu $tree->{$key}, $open, "$path$key.",$filter, $suffix;
+	            $print .= $prline
+   		    if $prline;
+        	}
+                $print .= "</p>";
+            } else {
+                $panel_count += 1;
+                if ($panel_count == 11) {$panel_count=6};
+                $sectionid = 'section_'.lc($key);
+                $print .= qq{<div id="$sectionid" class="$menuclass panel-$panel_count"><a href="$path$key$suffix" style='text-transform:uppercase;font-size:2em;'>$menu</a>\n};
+                if ($key eq $current){
+$tmp = lc($key);
+$print .= qq[
+<script type="text/javascript">
+jQuery(document).ready(function () {
+var topPos = jQuery('gap').scrollTop();
+topPos = 0;
+if (jQuery('#section_$tmp').position().top >= topPos ){
+    jQuery('html, body').animate({
+        scrollTop: jQuery('#section_$tmp').offset().top
+    }, 'fast');
+};
+
+});
+</script>
+];
+                    my $prline = target_menu $tree->{$key}, $open, "$path$key.",$filter, $suffix;
+	            $print .= $prline
+   		    if $prline;
+        	}
+                $print .= "</div>";
+            }
 	}
+    }
+    $print .= "</div>\n" unless $filter;
+    if ($filter){
+        if (wantarray()){
+	    return @matches;
+	} else {
+	    $print .= qq{<ul class="filter menu">\n};
+	    for my $entry (sort {$a->[1] cmp $b->[1] } grep {ref $_ eq 'ARRAY'} @matches) {
+	        my ($href,$menu,$class,$menuclass) = @{$entry};
+		$print .= qq{<span class="$class"><a class="$menuclass" href="$href">$menu</a></span>\n};
+	    }
+	    $print .= "</div>\n";
+	}
+    }
     return $print;
 };
 
@@ -1681,16 +1710,18 @@ sub hierarchy_switcher($$){
 				    );
              $print .= "</div></div>";
      }
-     $print .= "<div class=\"filter\">";
-     $print .= "<label for=\"filter\" class=\"filter-label\">Filter:</label>";
-     $print .= "<div class=\"filter-text\">";
-     $print .= $q->textfield (-name=>'filter',
-                     -id=>'filter',
-                     -placeholder=>'Filter menu...',
-                     -onChange=>'hswitch.submit()',
-		             -size=>15,
-			    );
-     $print .= '</div></div>'.$q->end_form();
+
+# Taking out filter for now
+#     $print .= "<div class=\"panel-3\">";
+#     $print .= "<label for=\"filter\" class=\"filter-label\">Filter:</label>";
+#     $print .= "<div class=\"filter-text\">";
+#     $print .= $q->textfield (-name=>'filter',
+#                     -id=>'filter',
+#                     -placeholder=>'Filter menu...',
+#                     -onChange=>'hswitch.submit()',
+#		             -size=>15,
+#			    );
+#     $print .= '</div></div>'.$q->end_form();
      return $print;
 }
 
