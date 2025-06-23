@@ -708,6 +708,9 @@ sub get_tree($$){
 
 sub target_menu($$$$;$);
 sub target_menu($$$$;$){
+    my $tmp;
+    my $sectionid;
+    my $panel_count = 3;
     my $tree = shift;
     my $open = shift;
     $open = [@$open]; # make a copy 
@@ -724,7 +727,7 @@ sub target_menu($$$$;$){
     }
     return wantarray ? () : "" unless @hashes;
 
-	$print .= qq{<ul class="menu">\n}
+	$print .= qq{<div class="menu">\n}
 		unless $filter;
 
 	my @matches;
@@ -760,56 +763,82 @@ sub target_menu($$$$;$){
 			if ( @$open ) {
          		$class = 'menuopen';
     		} else {
-   	            $class = 'menuactive';
-                $menuclass = "menulinkactive";
-            }
-   	    };
-		if ($filter){
-			my $filter_re;
-			if (($cfg->{Presentation}{literalsearch} || 'no') eq 'yes') {
-				$filter_re = qr/\Q$filter\E/i;
-			} else {
-				$filter_re = qr/$filter/i;
-			}
-			if (($menu and $menu =~ $filter_re) or ($title and $title =~ $filter_re)){
-				push @matches, ["$path$key$suffix",$menu,$class,$menuclass];
-			};
-			push @matches, target_menu($tree->{$key}, $open, "$path$key.",$filter, $suffix);
-		}
-		else {
-             if ($menuextra){
-                 $menuextra =~ s/{HOST}/#$host/g;
-                 $menuextra =~ s/{CLASS}/$menuclass/g;
-                 $menuextra =~ s/{HASH}/#/g;
-                 $menuextra =~ s/{HOSTNAME}/$host/g;
-                 $menuextra = '&nbsp;'.$menuextra;
-             } else {
-                 $menuextra = '';
-             }
-
-          	$print .= qq{<li class="$class"><a class="$menuclass" href="$path$key$suffix">$menu</a>\n};
-     	    if ($key eq $current){
-        	    my $prline = target_menu $tree->{$key}, $open, "$path$key.",$filter, $suffix;
-	            $print .= $prline
-   		           if $prline;
-        	}
-            $print .= "</li>";
-		}
-    }
-    $print .= "</ul>\n" unless $filter;
+   	        	$class = 'menuactive';
+                	$menuclass = "menulinkactive";
+            	}
+	};
 	if ($filter){
-		if (wantarray()){
-			return @matches;
+		my $filter_re;
+		if (($cfg->{Presentation}{literalsearch} || 'no') eq 'yes') {
+			$filter_re = qr/\Q$filter\E/i;
+		} else {
+			$filter_re = qr/$filter/i;
 		}
-		else {
-			$print .= qq{<ul class="menu">\n};
-			for my $entry (sort {$a->[1] cmp $b->[1] } grep {ref $_ eq 'ARRAY'} @matches) {
-				my ($href,$menu,$class,$menuclass) = @{$entry};
-				$print .= qq{<li class="$class"><a class="$menuclass" href="$href">$menu</a></li>\n};
+		if (($menu and $menu =~ $filter_re) or ($title and $title =~ $filter_re)){
+			push @matches, ["$path$key$suffix",$menu,$class,$menuclass];
+		};
+		push @matches, target_menu($tree->{$key}, $open, "$path$key.",$filter, $suffix);
+	} else {
+        	if ($menuextra){
+                	$menuextra =~ s/{HOST}/#$host/g;
+	                $menuextra =~ s/{CLASS}/$menuclass/g;
+                	$menuextra =~ s/{HASH}/#/g;
+                	$menuextra =~ s/{HOSTNAME}/$host/g;
+                	$menuextra = '&nbsp;'.$menuextra;
+             	} else {
+                	$menuextra = '';
+             	}
+
+		if ( $path =~ /\.\z/ ) {
+                	$print .= qq{<p class="hop $menuclass"><a href="$path$key$suffix" style='text-transform:uppercase;'>$menu</a>\n};
+	   	    	if ($key eq $current){
+        			my $prline = target_menu $tree->{$key}, $open, "$path$key.",$filter, $suffix;
+		            	$print .= $prline
+			    	if $prline;
+        	}
+            	$print .= "</p>";
+	} else {
+		$panel_count += 1;
+		if ($panel_count == 11) {$panel_count=6};
+		$sectionid = 'section_'.lc($key);
+		$print .= qq{<div id="$sectionid" class="$menuclass panel-$panel_count"><a href="$path$key$suffix" style='text-transform:uppercase;font-size:2em;'>$menu</a>\n};
+		if ($key eq $current){
+			$tmp = lc($key);
+			$print .= qq[
+				<script type="text/javascrpt">
+				jQuery(document).ready(function () {
+				var topPos = jquery('gap').scrollTop();
+				topPos = 0;
+				if (jQuery('#section_$tmp').position().top >= topPos ){
+					jQuery('html, body').animate({
+						scrollTop: jQuery('#section_$tmp').offset().top
+					}, 'fast');
+				};
+				});
+				</script>
+				];
+				my $prline = target_menu $tree->{$key}, $open, "$path$key.",$filter, $suffix;
+				$print .= $prline
+				if $prline;
 			}
-			$print .= "</ul>\n";
+			$print .= "</div>";
 		}
 	}
+    }
+    $print .= "</div>\n" unless $filter;
+    if ($filter){
+   	if (wantarray()){
+		return @matches;
+	}
+	else {
+		$print .= qq{<ul class="filter menu">\n};
+		for my $entry (sort {$a->[1] cmp $b->[1] } grep {ref $_ eq 'ARRAY'} @matches) {
+			my ($href,$menu,$class,$menuclass) = @{$entry};
+			$print .= qq{<span class="$class"><a class="$menuclass" href="$href">$menu</a></li>\n};
+		}
+		$print .= "</div>\n";
+	}
+    }
     return $print;
 };
 
@@ -1688,16 +1717,18 @@ sub hierarchy_switcher($$){
 				    );
              $print .= "</div></div>";
      }
-     $print .= "<div class=\"filter\">";
-     $print .= "<label for=\"filter\" class=\"filter-label\">Filter:</label>";
-     $print .= "<div class=\"filter-text\">";
-     $print .= $q->textfield (-name=>'filter',
-                     -id=>'filter',
-                     -placeholder=>'Filter menu...',
-                     -onChange=>'hswitch.submit()',
-		             -size=>15,
-			    );
-     $print .= '</div></div>'.$q->end_form();
+
+# Taking out filter for now
+#     $print .= "<div class=\"filter\">";
+#     $print .= "<label for=\"filter\" class=\"filter-label\">Filter:</label>";
+#     $print .= "<div class=\"filter-text\">";
+#     $print .= $q->textfield (-name=>'filter',
+#                     -id=>'filter',
+#                     -placeholder=>'Filter menu...',
+#                     -onChange=>'hswitch.submit()',
+#		             -size=>15,
+#			    );
+#     $print .= '</div></div>'.$q->end_form();
      return $print;
 }
 
